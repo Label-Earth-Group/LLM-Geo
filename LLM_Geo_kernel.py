@@ -84,8 +84,10 @@ class Solution():
             system_role=None,
             model=None,
             ):
-
-        openai.api_key = constants.OpenAI_key
+        """
+        This function interacts with an OpenAI language model to get a response based on a provided prompt.
+        """
+        client = openai.OpenAI(api_key=constants.OpenAI_key)
 
         if system_role is None:
             system_role = self.role
@@ -93,16 +95,15 @@ class Solution():
         if model is None:
             model = self.model
 
-        # Query ChatGPT with the prompt
+        # Query ChatGPT with the prompt, with retries
         # if verbose:
         #     print("Geting LLM reply... \n")
-        count = 0
-        isSucceed = False
         self.chat_history.append({'role': 'user', 'content': prompt})
-        while (not isSucceed) and (count < retry_cnt):
+        
+        response_chunks = []  # Initialize response chunks list
+        for attempt in range(retry_cnt):
             try:
-                count += 1
-                response = openai.ChatCompletion.create(
+                response = client.chat.completions.create(
                     model=model,
                     # messages=self.chat_history,  # Too many tokens to run.
                     messages=[
@@ -112,33 +113,42 @@ class Solution():
                     temperature=temperature,
                     stream=stream,
                 )
+                
+                # Process response
+                if stream:
+                    for chunk in response:
+                        response_chunks.append(chunk)                    
+                        if verbose:
+                            content = helper.get_response_content(chunk)
+                            if content:
+                                print(content, end='')
+                else:
+                    response_chunks.append(response)
+                    if verbose:
+                        content = helper.get_response_content(response)
+                        print(content)
+                
+                # If successful, break from loop
+                break
+
             except Exception as e:
                 # logging.error(f"Error in get_LLM_reply(), will sleep {sleep_sec} seconds, then retry {count}/{retry_cnt}: \n", e)
-                print(f"Error in get_LLM_reply(), will sleep {sleep_sec} seconds, then retry {count}/{retry_cnt}: \n",
-                      e)
+                print(f"Error in get_LLM_reply(), will sleep {sleep_sec} seconds, then retry {attempt}/{retry_cnt}: \n", e)
                 time.sleep(sleep_sec)
 
-        response_chucks = []
-        if stream:
-            for chunk in response:
-                response_chucks.append(chunk)
-                content = chunk["choices"][0].get("delta", {}).get("content")
-                if content is not None:
-                    if verbose:
-                        print(content, end='')
-        else:
-            content = response["choices"][0]['message']["content"]
-            # print(content)
+        # Check if response is received
+        if not response_chunks:
+            print("Failed to receive a response after multiple attempts.")
+            return None
+
+        
+        # final process of response
         print('\n\n')
         # print("Got LLM reply.")
-
-        response = response_chucks  # good for saving
-
-        content = helper.extract_content_from_LLM_reply(response)
-
+        content = helper.extract_content_from_LLM_reply(response_chunks)
         self.chat_history.append({'role': 'assistant', 'content': content})
 
-        return response
+        return response_chunks
 
 
     def get_LLM_response_for_graph(self, execuate=True):
