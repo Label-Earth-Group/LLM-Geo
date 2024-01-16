@@ -149,8 +149,103 @@ class Solution():
         self.chat_history.append({'role': 'assistant', 'content': content})
 
         return response_chunks
+    
+
+    def yield_LLM_reply(self,
+            prompt,
+            verbose=True,
+            temperature=1,
+            stream=True,
+            retry_cnt=3,
+            sleep_sec=10,
+            system_role=None,
+            model=None,
+            container_for_response=[]
+            ):
+        """
+        This function interacts with an OpenAI language model to get a response based on a provided prompt.
+        """
+        client = openai.OpenAI(api_key=constants.OpenAI_key)
+
+        if system_role is None:
+            system_role = self.role
+
+        if model is None:
+            model = self.model
+
+        # Query ChatGPT with the prompt, with retries
+        # if verbose:
+        #     print("Geting LLM reply... \n")
+        self.chat_history.append({'role': 'user', 'content': prompt})
+        
+
+        for attempt in range(retry_cnt):
+            try:
+                response = client.chat.completions.create(
+                    model=model,
+                    # messages=self.chat_history,  # Too many tokens to run.
+                    messages=[
+                                {"role": "system", "content": constants.operation_role},
+                                {"role": "user", "content": prompt},
+                              ],
+                    temperature=temperature,
+                    stream=stream,
+                )
+                
+                # Process response
+                if stream:
+                    for chunk in response:
+                        container_for_response.append(chunk)                    
+                        if verbose:
+                            content = helper.get_response_content(chunk)
+                            yield content
+                
+                # If successful, break from loop
+                break
+
+            except Exception as e:
+                # logging.error(f"Error in get_LLM_reply(), will sleep {sleep_sec} seconds, then retry {count}/{retry_cnt}: \n", e)
+                yield f"Error in get_LLM_reply(), will sleep {sleep_sec} seconds, then retry {attempt}/{retry_cnt}: \n"
+                time.sleep(sleep_sec)
+
+        # Check if response is received
+        if not container_for_response:
+            yield "Failed to receive a response after multiple attempts."
+            return None
+
+        
+        # final process of response        
+        # print("Got LLM reply.")
+        content = helper.extract_content_from_LLM_reply(container_for_response)
+        self.chat_history.append({'role': 'assistant', 'content': content})
+        yield '\n\n' 
 
 
+    def yield_LLM_response_for_graph(self, execuate=True):
+        # self.chat_history.append()
+        self.graph_response = []
+
+        for content in self.yield_LLM_reply(
+                            prompt=self.graph_prompt,
+                            system_role=self.role,
+                            model=self.model,
+                            container_for_response=self.graph_response
+        ):
+            yield content
+
+        print('here')
+
+        try:
+            self.code_for_graph = helper.extract_code(response=self.graph_response, verbose=False)
+        except Exception as e:
+            self.code_for_graph = ""
+            print("Extract graph Python code rom LLM failed.")
+        if execuate:
+            exec(self.code_for_graph)
+            self.load_graph_file()
+            yield "\n\n"
+
+    
     def get_LLM_response_for_graph(self, execuate=True):
         # self.chat_history.append()
         response = self.get_LLM_reply(
@@ -335,6 +430,37 @@ class Solution():
                          )
             # print(response)
             operation['response'] = response
+            try:
+                operation_code = helper.extract_code(response=operation['response'], verbose=False)
+            except Exception as e:
+                operation_code = ""
+            operation['operation_code'] = operation_code
+
+            if review:
+                operation = self.ask_LLM_to_review_operation_code(operation)
+            
+        return self.operations
+    
+
+    def yield_LLM_responses_for_operations(self, review=True):
+        # def_list, data_node_list = helper.generate_function_def_list(self.solution_graph)
+        self.initial_operations()
+        for idx, operation in enumerate(self.operations):
+            node_name = operation['node_name']
+            print(f"{idx + 1} / {len(self.operations)}, LLM is generating code for operation node: {operation['node_name']}")
+            prompt = self.get_prompt_for_an_opearation(operation)
+
+            operation['response'] = []
+
+            for content in self.yield_LLM_reply(
+                          prompt=prompt,
+                          system_role=constants.operation_role,
+                          model=self.model,
+                          container_for_response=operation['response']
+                          # model=r"gpt-4",
+                         ):
+                yield content
+                
             try:
                 operation_code = helper.extract_code(response=operation['response'], verbose=False)
             except Exception as e:

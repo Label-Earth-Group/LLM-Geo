@@ -1,3 +1,13 @@
+# To modify the backend
+- Use session to store a user task session and later form multiple requests, tested to be effective
+- To utilize Server-Side Event, the original python files should be modified:
+  - The basic approach is to replace all `print` with `yield` to sent date to the frontend
+  - generate graph code completed
+  - graph file generated and sent to the client, but the client has problem with display
+  - generate operation code not completed: this is a little complicated as it is related to review process
+  - the final output not dealt with
+- The `main.py` is the fastapi file.
+
 # Autonomous GIS: the next-generation AI-powered GIS
 
 GIS stands for Geographic Information System; one of its major functionality is to conduct spatial analysis, manually, in the current stage. Large Language Models (LLMs), such as ChatGPT, demonstrate a strong understanding of human natural language and have been explored and applied in various fields, including reasoning, creative writing, code generation, translation, and information retrieval. 
