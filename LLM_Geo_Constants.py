@@ -1,4 +1,5 @@
 import configparser
+import os
 config = configparser.ConfigParser()
 config.read('config.ini')
 
@@ -122,12 +123,13 @@ If joining FIPS or GEOID, need to fill the leading zeros (digits: state: 2, coun
 #--------------- constants for assembly prompt generation  ---------------
 assembly_role =  r'''A professional Geo-information scientist and programmer good at Python. You have worked on Geographic information science more than 20 years, and know every detail and pitfall when processing spatial data and coding. Your are very good at assembling functions and small programs together. You know how to make programs robust.
 '''
-
-assembly_requirement = ['You can think step by step. ',
+def assembly_requirement(save_dir):
+    output_dir = os.path.join(save_dir, 'output')
+    requirement = ['You can think step by step. ',
                     f"Each function is one step to solve the question. ",
                     f"The output of the final function is the question to the question.",
                     f"Put your reply in a code block(enclosed by ```python and ```), NO explanation or conversation outside the code block.",              
-                    f"Save final maps, if any. If use matplotlib, the function is: matplotlib.pyplot.savefig(*args, **kwargs).",
+                    f"Save final maps, if any, in this folder: {output_dir}. If use matplotlib, the function is: matplotlib.pyplot.savefig(*args, **kwargs).",
                     f"The program is executable, put it in a function named 'assembely_solution()' then run it, but DO NOT use 'if __name__ == '__main__:' statement because this program needs to be executed by exec().",
                     "Use the built-in functions or attribute, if you do not remember, DO NOT make up fake ones, just use alternative methods.",
                     # "Drop rows with NaN cells, i.e., df.dropna(),  before using Pandas or GeoPandas columns for processing (e.g. join or calculation).",
@@ -135,6 +137,7 @@ assembly_requirement = ['You can think step by step. ',
                     "Geopandas.GeoSeries.intersects(other, align=True) returns a Series of dtype('bool') with value True for each aligned geometry that intersects other. other:GeoSeries or geometric object. ",
                     "Note geopandas.sjoin() returns all joined pairs, i.e., the return could be one-to-many. E.g., the intersection result of a polygon with two points inside it contains two rows; in each row, the polygon attribute is the same. If you need of extract the polygons intersecting with the points, please remember to remove the duplicated rows in the results.",
                     ]
+    return requirement
 
 #--------------- constants for direct request prompt generation  ---------------
 direct_request_role = r'''A professional Geo-information scientist and programmer good at Python. You have worked on Geographic information science more than 20 years, and know every detail and pitfall when processing spatial data and coding. Yor programs are always concise and robust, considering the various data circumstances, such as map projections, column data types, and spatial joinings. You are also super experienced on generating map.
@@ -186,7 +189,10 @@ debug_role =  r'''A professional Geo-information scientist and programmer good a
 
 debug_task_prefix = r'You need to correct the code of a program based on the given error information, then return the complete corrected code.'
 
-debug_requirement = [
+
+def debug_requirement(save_dir):
+    output_dir = os.path.join(save_dir, 'output')
+    debug_requirement = [
                         'Correct the code. Revise the buggy parts, but need to keep program structure, i.e., the function name, its arguments, and returns.',
                         'Elaborate your reasons for revision.',
                         'You must return the entire corrected program in only one Python code block(enclosed by ```python and ```); DO NOT return the revised part only.',
@@ -214,7 +220,9 @@ debug_requirement = [
                         "When read FIPS or GEOID columns from CSV files, read those columns as str or int, never as float.",
                         "FIPS or GEOID columns may be str type with leading zeros (digits: state: 2, county: 5, tract: 11, block group: 12), or integer type without leading zeros. Thus, when joining using they, you can convert the integer colum to str type with leading zeros to ensure the success.",
                         "If you need to make a map and the map size is not given, set the map size to 15*10 inches.",
+                        f"Save all the final maps in png or jpg files, if any, in this folder: {output_dir}.",
                         ]
+    return debug_requirement
 
 #--------------- constants for operation review prompt generation  ---------------
 operation_review_role =  r'''A professional Geo-information scientist and developer good at Python. You have worked on Geographic information science more than 20 years, and know every detail and pitfall when processing spatial data and coding. Your current job is to review other's code, mostly single functions; you are a very careful person, and enjoy code review. You love to point out the potential bugs of code of data misunderstanding.

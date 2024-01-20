@@ -16,15 +16,19 @@ from pyvis.network import Network
 
 import LLM_Geo_Constants as constants
 
-def extract_content_from_LLM_reply(response):
-    stream = False
-    if isinstance(response, list):
-        stream = True
-        
+
+def get_response_content(chunk):
+    try: 
+        content = chunk.choices[0].delta.content or ''
+        return content
+    except:
+        return None
+
+def extract_content_from_LLM_reply(response):        
     content = ""
-    if stream:       
+    if isinstance(response, list):   
         for chunk in response:
-            chunk_content = chunk["choices"][0].get("delta", {}).get("content")         
+            chunk_content = get_response_content(chunk)         
 
             if chunk_content is not None:
                 # print(chunk_content, end='')
@@ -32,7 +36,7 @@ def extract_content_from_LLM_reply(response):
                 # print(content)
         # print()
     else:
-        content = response["choices"][0]['message']["content"]
+        content = get_response_content(response)
         # print(content)
         
     return content
@@ -66,116 +70,67 @@ def extract_code(response, verbose=False):
     return python_code
 
 
-def get_LLM_reply(prompt="Provide Python code to read a CSV file from this URL and store the content in a variable. ",
+
+def get_LLM_reply(prompt="Provide Python code to read a CSV file from this URL and store the content in a variable.",
                   system_role=r'You are a professional Geo-information scientist and developer.',
                   model=r"gpt-3.5-turbo",
                   verbose=True,
                   temperature=1,
                   stream=True,
                   retry_cnt=3,
-                  sleep_sec=10,
-                  ):
-    openai.api_key = constants.OpenAI_key
+                  sleep_sec=10):
+    """
+    This function interacts with an OpenAI language model to get a response based on a provided prompt.
+    """
+    client = openai.OpenAI(api_key=constants.OpenAI_key)
 
-    # Generate prompt for ChatGPT
-    # url = "https://github.com/gladcolor/LLM-Geo/raw/master/overlay_analysis/NC_tract_population.csv"
-    # prompt = prompt + url
+    # Initialize response chunks list
+    response_chunks = []
 
-    # Query ChatGPT with the prompt
-    # if verbose:
-    #     print("Geting LLM reply... \n")
-    count = 0
-    isSucceed = False
-    while (not isSucceed) and (count < retry_cnt):
+    # Attempt to get a response from the LLM, with retries
+    for attempt in range(retry_cnt):
         try:
-            count += 1
-            response = openai.ChatCompletion.create(
-                model=model,
-                messages=[
-                {"role": "system", "content": system_role},
-                {"role": "user", "content": prompt},
-                ],
-                temperature=temperature,
-                stream=stream,
-                )
-            isSucceed = True
-        except Exception as e:
-            # logging.error(f"Error in get_LLM_reply(), will sleep {sleep_sec} seconds, then retry {count}/{retry_cnt}: \n", e)
-            print(f"Error in get_LLM_reply(), will sleep {sleep_sec} seconds, then retry {count}/{retry_cnt}: \n", e)
-            time.sleep(sleep_sec)
-
-
-    response_chucks = []
-    if stream:
-        for chunk in response:
-            response_chucks.append(chunk)
-            content = chunk["choices"][0].get("delta", {}).get("content")
-            if content is not None:
-                if verbose:
-                    print(content, end='')
-    else:
-        content = response["choices"][0]['message']["content"]
-        # print(content)
-    print('\n\n')
-    # print("Got LLM reply.")
-        
-    response = response_chucks # good for saving
-    
-    return response
-
-
-def yield_LLM_reply(prompt="Provide Python code to read a CSV file from this URL and store the content in a variable. ",
-                  system_role=r'You are a professional Geo-information scientist and developer.',
-                  model=r"gpt-3.5-turbo",
-                  verbose=True,
-                  temperature=1,
-                  stream=True,
-                  retry_cnt=3,
-                  sleep_sec=10,
-                  container_for_response=[]
-                  ):
-    openai.api_key = constants.OpenAI_key
-
-    # Generate prompt for ChatGPT
-    # url = "https://github.com/gladcolor/LLM-Geo/raw/master/overlay_analysis/NC_tract_population.csv"
-    # prompt = prompt + url
-
-    # Query ChatGPT with the prompt
-    # if verbose:
-    #     print("Geting LLM reply... \n")
-    count = 0
-    isSucceed = False
-    while (not isSucceed) and (count < retry_cnt):
-        try:
-            count += 1
-            response = openai.ChatCompletion.create(
+            response = client.chat.completions.create(
                 model=model,
                 messages=[
                     {"role": "system", "content": system_role},
                     {"role": "user", "content": prompt},
                 ],
                 temperature=temperature,
-                stream=stream,
+                stream=stream
             )
-            isSucceed = True
+            
+            # Process response
+            if stream:
+                for chunk in response:
+                    response_chunks.append(chunk)                    
+                    if verbose:
+                        content = get_response_content(chunk)
+                        if content:
+                            print(content, end='')
+            else:
+                response_chunks.append(response)
+                if verbose:
+                    content = get_response_content(response)
+                    print(content)
+            
+            # If successful, break from loop
+            break
+
         except Exception as e:
-            # logging.error(f"Error in get_LLM_reply(), will sleep {sleep_sec} seconds, then retry {count}/{retry_cnt}: \n", e)
-            print(f"Error in get_LLM_reply(), will sleep {sleep_sec} seconds, then retry {count}/{retry_cnt}: \n", e)
+            logging.error(f"Attempt {attempt + 1}/{retry_cnt} failed. Retrying in {sleep_sec} seconds.", exc_info=True)
             time.sleep(sleep_sec)
 
-    if stream:
-        for chunk in response:
-            container_for_response.append(chunk)
-            content = chunk["choices"][0].get("delta", {}).get("content")
-            if content is not None:
-                if verbose:
-                    yield content
+    # Check if response is received
+    if not response_chunks:
+        logging.error("Failed to receive a response after multiple attempts.")
+        return None
 
     print('\n\n')
-    # print("Got LLM reply.")
-    yield '\n\n'
+    return response_chunks
 
 
+ 
 def has_disconnected_components(directed_graph, verbose=True):
     # Get the weakly connected components
     weakly_connected = list(nx.weakly_connected_components(directed_graph))
@@ -406,3 +361,6 @@ def find_source_node(graph):
 
     # Return the source nodes
     return source_nodes
+
+if __name__=='__main__':
+    get_LLM_reply()
