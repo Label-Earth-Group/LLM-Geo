@@ -45,10 +45,11 @@ graph_requirement = [
                         'Add all nodes and edges, including node attributes to a NetworkX instance, DO NOT change the attribute names.',
                         'DO NOT generate code to implement the steps.',
                         'Join the attribute to the vector layer via a common attribute if necessary.',
-                        'Put your reply into a Python code block, NO explanation or conversation outside the code block(enclosed by ```python and ```).',
-                        'Note that GraphML writer does not support class dict or list as data values.',
+                        'Put your reply into a Python code block, NO explanation or conversation outside the code block(enclosed by ```python and ```).',                        
                         'You need spatial data (e.g., vector or raster) to make a map.',
+                        'Note that GraphML writer does not support class dict or list as data values.',
                         'Do not put the GraphML writing process as a step in the graph.',
+                        'Pay attention to the correct string format of slashes in writing path, and if necessary, use r"writing_path" to format the writing_path string',
                         'Keep the graph concise, DO NOT use too many operation nodes.',
                         # 'Keep the graph concise, DO NOT over-split task into too many small steps, especially for simple problems. For example, data loading and data transformation/preprocessing should be in one operation node.',
 
