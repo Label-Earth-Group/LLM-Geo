@@ -512,7 +512,7 @@ class Solution():
     def yield_LLM_assembly_response(self, review=True):
         self.prompt_for_assembly_program()
         self.assembly_LLM_response = []
-        for content in helper.yield_LLM_reply(self.assembly_prompt,
+        for content in self.yield_LLM_reply(prompt=self.assembly_prompt,
                                               system_role=constants.assembly_role,
                                               model=self.model,
                                               container_for_response=self.assembly_LLM_response
@@ -623,7 +623,7 @@ class Solution():
         if not self.exec_code:
             all_operation_code_str = '\n'.join([operation['operation_code'] for operation in self.operations])
             self.exec_code = all_operation_code_str + '\n' + self.code_for_assembly
-            self.exec_code = self.replace_print_with_yield(self.exec_code)
+            # self.exec_code = self.replace_print_with_yield(self.exec_code)
 
         print(self.exec_code)
 
@@ -657,7 +657,7 @@ class Solution():
                 yield "Sending error information to LLM for debugging... \n\n"
                 # print("Prompt:\n", debug_prompt)
                 response = []
-                for content in helper.yield_LLM_reply(prompt=debug_prompt,
+                for content in self.yield_LLM_reply(prompt=debug_prompt,
                                                       system_role=constants.debug_role,
                                                       model=self.model,
                                                       verbose=True,
@@ -667,7 +667,7 @@ class Solution():
                                                       ):
                     yield content
                 self.exec_code = helper.extract_code(response)
-                self.exec_code = self.replace_print_with_yield(self.exec_code)
+                # self.exec_code = self.replace_print_with_yield(self.exec_code)
                 # self.save_solution()
 
         if not is_success:
@@ -790,7 +790,7 @@ class Solution():
         yield "LLM is reviewing the operation code... \n"
         # print(f"review_prompt:\n{review_prompt}")
         response = []
-        for content in helper.yield_LLM_reply(prompt=review_prompt,
+        for content in self.yield_LLM_reply(prompt=review_prompt,
                                               system_role=constants.operation_review_role,
                                               model=self.model,
                                               verbose=True,
@@ -848,7 +848,7 @@ class Solution():
         yield "LLM is reviewing the assembly code... \n"
         # print(f"review_prompt:\n{review_prompt}")
         response = []
-        for content in helper.yield_LLM_reply(prompt=review_prompt,
+        for content in self.yield_LLM_reply(prompt=review_prompt,
                                               system_role=constants.assembly_review_role,
                                               model=self.model,
                                               verbose=True,
